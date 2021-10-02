@@ -24,6 +24,7 @@ sudo supervisorctl update
 ## Upate on `majordome`
 
 ```shell
+source ~/rtl433_to_mqtt/bin/activate
 pip install -U git+http://majordome:8050/jonathan/rtl433_to_mqtt.git
 sudo supervisorctl restart rtl433_to_mqtt
 ```
