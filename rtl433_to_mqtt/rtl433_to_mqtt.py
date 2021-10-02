@@ -10,6 +10,7 @@ import string
 from typing import Dict, Any, Tuple
 import click
 import paho.mqtt.client as mqtt
+from rtl433_to_mqtt import __version__
 
 
 characters = string.ascii_letters * 2 + string.digits
@@ -95,6 +96,7 @@ def random_id():
 @click.option("--mqtt-port", default=1883, type=int, metavar='port', help="MQTT server port")
 @click.option("-v", "--verbose", is_flag=True, help="Verbose mode")
 def main(mqtt_host: str, mqtt_port: int, verbose: bool):
+    print(f"Starting rtl433_to_mqtt.py {__version__}")
     device_ids = [sensor.device_id for sensor in sensors]
     if None in device_ids:
         raise ValueError("Malformed configuration: missing device_id property in one or more sensors.")
@@ -102,7 +104,7 @@ def main(mqtt_host: str, mqtt_port: int, verbose: bool):
     for device_id in device_ids:
         cmd += ["-R", str(device_id)]
 
-    print("Starting {cmd}".format(cmd=" ".join(cmd)))
+    print("Running {cmd}".format(cmd=" ".join(cmd)))
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     try:
         client = mqtt.Client(client_id=f'rtl433-to-mqtt-{random_id()}', clean_session=True)
