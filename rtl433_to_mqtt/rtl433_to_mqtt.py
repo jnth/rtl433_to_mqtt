@@ -5,9 +5,14 @@
 
 import json
 import subprocess
+import random
+import string
 from typing import Dict, Any, Tuple
 import click
 import paho.mqtt.client as mqtt
+
+
+characters = string.ascii_letters * 2 + string.digits
 
 
 class BaseSensor:
@@ -81,6 +86,10 @@ def process_line(line: str) -> Tuple[str, str]:
             return sensor_instance.topic, sensor_instance.to_json()
 
 
+def random_id():
+    return "".join(random.sample(characters, k=6))
+
+
 @click.command(help=__doc__)
 @click.option("--mqtt-host", default="127.0.0.1", metavar='host', help="MQTT server hostname")
 @click.option("--mqtt-port", default=1883, type=int, metavar='port', help="MQTT server port")
@@ -96,12 +105,13 @@ def main(mqtt_host: str, mqtt_port: int, verbose: bool):
     print("Starting {cmd}".format(cmd=" ".join(cmd)))
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     try:
-        client = mqtt.Client(client_id='rtl433-to-mqtt', clean_session=True)
+        client = mqtt.Client(client_id=f'rtl433-to-mqtt-{random_id()}', clean_session=True)
         client.connect(host=mqtt_host, port=mqtt_port)
         print(f"Connected to MQTT at {mqtt_host}:{mqtt_port}")
         for line in process.stdout:
             topic, payload = process_line(line.decode('utf-8'))
             client.publish(topic, payload, qos=1)
+            client.loop()
             if verbose:
                 print(f"topic={topic} payload={payload}")
     except KeyboardInterrupt:
