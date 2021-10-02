@@ -122,10 +122,13 @@ def main(mqtt_host: str, mqtt_port: int, verbose: bool):
 
     log.info("Running {cmd}".format(cmd=" ".join(cmd)))
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    client = mqtt.Client(client_id=f'rtl433-to-mqtt-{random_id()}', clean_session=True)
+    client.connect(host=mqtt_host, port=mqtt_port)
+    client.loop_start()
+    log.info(f"Connected to MQTT at {mqtt_host}:{mqtt_port}")
+
     try:
-        client = mqtt.Client(client_id=f'rtl433-to-mqtt-{random_id()}', clean_session=True)
-        client.connect(host=mqtt_host, port=mqtt_port)
-        log.info(f"Connected to MQTT at {mqtt_host}:{mqtt_port}")
         for line in process.stdout:
             try:
                 topic, payload = process_line(line.decode('utf-8'))
@@ -140,11 +143,15 @@ def main(mqtt_host: str, mqtt_port: int, verbose: bool):
             client.publish(topic, payload, qos=1)
             client.loop()
             log.debug(f"topic={topic} payload={payload}")
+
     except KeyboardInterrupt:
         log.info("Interuption by user")
-        return
+
     except Exception as exc:
         log.exception(f"An exception occurs: {exc}")
+
+    client.loop_stop()
+    client.disconnect()
 
 
 if __name__ == '__main__':
