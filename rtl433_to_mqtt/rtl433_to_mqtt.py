@@ -7,13 +7,24 @@ import json
 import subprocess
 import random
 import string
+import logging
 from typing import Dict, Any, Tuple
 import click
 import paho.mqtt.client as mqtt
-from rtl433_to_mqtt import __version__
 
+
+__version__ = "0.2.1-dev"
 
 characters = string.ascii_letters * 2 + string.digits
+
+
+# Log configuration
+lfmt = logging.Formatter("%(asctime)s | %(levelname)8s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+lch = logging.StreamHandler()
+lch.setFormatter(lfmt)
+log = logging.getLogger()
+log.addHandler(lch)
+log.setLevel(logging.DEBUG)
 
 
 class BaseSensor:
@@ -65,6 +76,8 @@ class PresenceDetectorSensor(BaseSensor):
 
     @property
     def topic(self):
+        if self.data['id'] not in self.location_ids:
+            raise Warning(f"Cannot find location with id {self.data['id']}")
         location = self.location_ids[self.data['id']]
         return f"home/sensor/{location}/detector"
 
@@ -96,7 +109,10 @@ def random_id():
 @click.option("--mqtt-port", default=1883, type=int, metavar='port', help="MQTT server port")
 @click.option("-v", "--verbose", is_flag=True, help="Verbose mode")
 def main(mqtt_host: str, mqtt_port: int, verbose: bool):
-    print(f"Starting rtl433_to_mqtt.py {__version__}")
+    log_level = logging.DEBUG if verbose else logging.INFO
+    log.setLevel(log_level)
+
+    log.info(f"Starting rtl433_to_mqtt.py {__version__}")
     device_ids = [sensor.device_id for sensor in sensors]
     if None in device_ids:
         raise ValueError("Malformed configuration: missing device_id property in one or more sensors.")
@@ -104,25 +120,31 @@ def main(mqtt_host: str, mqtt_port: int, verbose: bool):
     for device_id in device_ids:
         cmd += ["-R", str(device_id)]
 
-    print("Running {cmd}".format(cmd=" ".join(cmd)))
+    log.info("Running {cmd}".format(cmd=" ".join(cmd)))
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     try:
         client = mqtt.Client(client_id=f'rtl433-to-mqtt-{random_id()}', clean_session=True)
         client.connect(host=mqtt_host, port=mqtt_port)
-        print(f"Connected to MQTT at {mqtt_host}:{mqtt_port}")
+        log.info(f"Connected to MQTT at {mqtt_host}:{mqtt_port}")
         for line in process.stdout:
-            topic, payload = process_line(line.decode('utf-8'))
+            try:
+                topic, payload = process_line(line.decode('utf-8'))
+            except Warning as warn:
+                log.warning(warn)
+                continue
+            except KeyboardInterrupt:
+                raise
+            except Exception as exc:
+                log.exception(exc)
+                continue
             client.publish(topic, payload, qos=1)
             client.loop()
-            if verbose:
-                print(f"topic={topic} payload={payload}")
+            log.debug(f"topic={topic} payload={payload}")
     except KeyboardInterrupt:
-        print("Interuption by user")
+        log.info("Interuption by user")
         return
     except Exception as exc:
-        import traceback
-        print(f"An exception occurs: {exc}")
-        traceback.print_exc()
+        log.exception(f"An exception occurs: {exc}")
 
 
 if __name__ == '__main__':
