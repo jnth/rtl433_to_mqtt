@@ -91,9 +91,9 @@ def main(mqtt_host: str, mqtt_port: int, verbose: bool):
         raise ValueError("Malformed configuration: missing device_id property in one or more sensors.")
     cmd = ["rtl_433", "-F", "json"]
     for device_id in device_ids:
-        cmd += ["-R", device_id]
+        cmd += ["-R", str(device_id)]
 
-    print(f"Starting {' '.join(cmd)}")
+    print("Starting {cmd}".format(cmd=" ".join(cmd)))
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     try:
         client = mqtt.Client(client_id='rtl433-to-mqtt', clean_session=True)
