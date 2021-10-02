@@ -37,7 +37,7 @@ class ThermometerSensor(BaseSensor):
 
     @property
     def topic(self):
-        return "home/sensor/outsite/thermometer"
+        return "home/sensor/garden/temperature"
 
     @property
     def json_to_export(self):
