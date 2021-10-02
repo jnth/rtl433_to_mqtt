@@ -104,6 +104,14 @@ def random_id():
     return "".join(random.sample(characters, k=6))
 
 
+def on_connect(client, userdata, flags, rc):
+    log.info(f"Connected to MQTT: userdata={userdata} flags={flags} rc={rc}")
+
+
+def on_message(client, userdata, msg):
+    log.debug(f"Message sent at {msg.topic}: {msg.payload}")
+
+
 @click.command(help=__doc__)
 @click.option("--mqtt-host", default="127.0.0.1", metavar='host', help="MQTT server hostname")
 @click.option("--mqtt-port", default=1883, type=int, metavar='port', help="MQTT server port")
@@ -124,9 +132,9 @@ def main(mqtt_host: str, mqtt_port: int, verbose: bool):
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     client = mqtt.Client(client_id=f'rtl433-to-mqtt-{random_id()}', clean_session=False)
+    client.on_connect = on_connect
+    client.on_message = on_message
     client.connect(host=mqtt_host, port=mqtt_port)
-    client.loop_start()
-    log.info(f"Connected to MQTT at {mqtt_host}:{mqtt_port}")
 
     try:
         for line in process.stdout:
@@ -150,7 +158,6 @@ def main(mqtt_host: str, mqtt_port: int, verbose: bool):
     except Exception as exc:
         log.exception(f"An exception occurs: {exc}")
 
-    client.loop_stop()
     client.disconnect()
 
 
