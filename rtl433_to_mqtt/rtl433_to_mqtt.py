@@ -3,8 +3,8 @@
 
 """Convert JSON output of `rtl_433` to MQTT message."""
 
-import sys
 import json
+import subprocess
 from typing import Dict, Any, Tuple
 import click
 import paho.mqtt.client as mqtt
@@ -12,10 +12,11 @@ import paho.mqtt.client as mqtt
 
 class BaseSensor:
     model = None
+    device_id = None
 
     def __init__(self, data: Dict[str, Any]):
-        if self.model is None:
-            raise ValueError("model must be set")
+        if self.model is None or self.device_id is None:
+            raise ValueError("model and device_id must be set")
         self.data = data
 
     @property
@@ -34,6 +35,7 @@ class BaseSensor:
 
 class ThermometerSensor(BaseSensor):
     model = "Acurite-606TX"
+    device_id = 55
 
     @property
     def topic(self):
@@ -47,6 +49,7 @@ class ThermometerSensor(BaseSensor):
 
 class PresenceDetectorSensor(BaseSensor):
     model = "Visonic-Powercode"
+    device_id = 151
 
     location_ids = {
         'a40706': 'living-room',
@@ -83,15 +86,27 @@ def process_line(line: str) -> Tuple[str, str]:
 @click.option("--mqtt-port", default=1883, type=int, metavar='port', help="MQTT server port")
 @click.option("-v", "--verbose", is_flag=True, help="Verbose mode")
 def main(mqtt_host: str, mqtt_port: int, verbose: bool):
+    device_ids = [sensor.device_id for sensor in sensors]
+    if None in device_ids:
+        raise ValueError("Malformed configuration: missing device_id property in one or more sensors.")
+    cmd = ["rtl_433", "-F", "json"]
+    for device_id in device_ids:
+        cmd += ["-R", device_id]
+
+    print(f"Starting {' '.join(cmd)}")
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     try:
         client = mqtt.Client(client_id='rtl433-to-mqtt', clean_session=True)
         client.connect(host=mqtt_host, port=mqtt_port)
         print(f"Connected to MQTT at {mqtt_host}:{mqtt_port}")
-        for line in sys.stdin:
-            topic, payload = process_line(line)
+        for line in process.stdout:
+            topic, payload = process_line(line.decode('utf-8'))
             client.publish(topic, payload, qos=1)
             if verbose:
                 print(f"topic={topic} payload={payload}")
+    except KeyboardInterrupt:
+        print("Interuption by user")
+        return
     except Exception as exc:
         import traceback
         print(f"An exception occurs: {exc}")
