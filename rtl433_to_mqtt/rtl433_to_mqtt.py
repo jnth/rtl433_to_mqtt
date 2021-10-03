@@ -2,6 +2,7 @@
 # coding: utf-8
 
 """Convert JSON output of `rtl_433` to MQTT message."""
+
 import datetime
 import json
 import os
@@ -14,9 +15,14 @@ from itertools import cycle
 from typing import Dict, Any, Tuple
 import click
 import paho.mqtt.client as mqtt
+from importlib.metadata import version
 from setuptools_scm import get_version
 
-__version__ = get_version(root='..', relative_to=__file__)
+try:
+    __version__ = get_version(root='..', relative_to=__file__)
+except LookupError:
+    __version__ = version("rtl433_to_mqtt")
+
 characters = string.ascii_letters * 2 + string.digits
 
 
