@@ -163,6 +163,7 @@ def main(mqtt_host: str, mqtt_port: int, verbose: bool, fake: bool):
     client = mqtt.Client(client_id=f'rtl433-to-mqtt-{random_id()}', clean_session=False)
     client.on_connect = on_connect(mqtt_host, mqtt_port)
     client.connect(host=mqtt_host, port=mqtt_port)
+    client.loop_start()
 
     try:
         for line in process:
@@ -177,7 +178,6 @@ def main(mqtt_host: str, mqtt_port: int, verbose: bool, fake: bool):
                 log.exception(exc)
                 continue
             client.publish(topic, payload, qos=1)
-            client.loop()
             log.debug(f"topic={topic} payload={payload}")
 
     except KeyboardInterrupt:
@@ -186,6 +186,7 @@ def main(mqtt_host: str, mqtt_port: int, verbose: bool, fake: bool):
     except Exception as exc:
         log.exception(f"An exception occurs: {exc}")
 
+    client.loop_stop()
     client.disconnect()
 
 
