@@ -2,7 +2,7 @@
 # coding: utf-8
 
 """Convert JSON output of `rtl_433` to MQTT message."""
-
+import datetime
 import json
 import os
 import subprocess
@@ -129,8 +129,11 @@ class FakeProcess:
 
     def __iter__(self):
         for line in cycle(self.lines):
-            time.sleep(random.randint(1, 5))
-            yield line.strip().encode('utf-8')
+            time.sleep(random.randint(1, 120))
+            data = json.loads(line)
+            data['time'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            as_str = json.dumps(data, separators=(',', ':'))
+            yield as_str.encode('utf-8')
 
 
 @click.command(help=__doc__)
