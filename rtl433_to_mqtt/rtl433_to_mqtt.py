@@ -183,7 +183,7 @@ def main(mqtt_host: str, mqtt_port: int, verbose: bool, fake: bool):
             log.debug(f"topic={topic} payload={payload}")
 
     except KeyboardInterrupt:
-        log.info("Interuption by user")
+        log.info("Interruption by user")
 
     except Exception as exc:
         log.exception(f"An exception occurs: {exc}")
