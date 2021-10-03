@@ -177,6 +177,8 @@ def main(mqtt_host: str, mqtt_port: int, verbose: bool, fake: bool):
             except Exception as exc:
                 log.exception(exc)
                 continue
+            if fake:
+                topic = f"fake/{topic}"  # use prefix to avoid erroneous publication
             client.publish(topic, payload, qos=1)
             log.debug(f"topic={topic} payload={payload}")
 
