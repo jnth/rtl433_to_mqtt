@@ -26,10 +26,12 @@ sudo supervisorctl reread
 sudo supervisorctl update
 ```
 
-## Upate on `majordome`
+## Update on `majordome`
+
+Do not use `pip` directly, even when the virtual environment is activated: it's not the right `pip`!
 
 ```shell
 source ~/rtl433_to_mqtt/bin/activate
-pip install -U git+http://majordome:8050/jonathan/rtl433_to_mqtt.git
+python -m pip install -U git+http://majordome:8050/jonathan/rtl433_to_mqtt.git@v0.3.0  # to use specific version
 sudo supervisorctl restart rtl433_to_mqtt
 ```
