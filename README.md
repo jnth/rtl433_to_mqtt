@@ -2,6 +2,11 @@
 
 Convert information from `rtl_433` script (in JSON) to MQTT.
 
+## Use fake data to test
+
+Use the `-f` option.
+
+
 ## Deploy on `majordome`
 
 Install this package:

@@ -4,10 +4,13 @@
 """Convert JSON output of `rtl_433` to MQTT message."""
 
 import json
+import os
 import subprocess
 import random
 import string
 import logging
+import time
+from itertools import cycle
 from typing import Dict, Any, Tuple
 import click
 import paho.mqtt.client as mqtt
@@ -104,19 +107,39 @@ def random_id():
     return "".join(random.sample(characters, k=6))
 
 
-def on_connect(client, userdata, flags, rc):
-    log.info(f"Connected to MQTT: userdata={userdata} flags={flags} rc={rc}")
+def on_connect(host, port):
+    def wrapper(*args, **kwargs):
+        log.info(f"Connected to MQTT broker {host}:{port}")
+    return wrapper
 
 
-def on_message(client, userdata, msg):
-    log.debug(f"Message sent at {msg.topic}: {msg.payload}")
+class ExternalProcess:
+    def __init__(self, cmd):
+        self.p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    def __iter__(self):
+        for line in self.p.stdout:
+            yield line
+
+
+class FakeProcess:
+    def __init__(self):
+        rootdir = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(rootdir, 'rtl433_fake.txt')) as f:
+            self.lines = f.readlines()
+
+    def __iter__(self):
+        for line in cycle(self.lines):
+            time.sleep(random.randint(1, 5))
+            yield line.strip().encode('utf-8')
 
 
 @click.command(help=__doc__)
 @click.option("--mqtt-host", default="127.0.0.1", metavar='host', help="MQTT server hostname")
 @click.option("--mqtt-port", default=1883, type=int, metavar='port', help="MQTT server port")
 @click.option("-v", "--verbose", is_flag=True, help="Verbose mode")
-def main(mqtt_host: str, mqtt_port: int, verbose: bool):
+@click.option("-f", "--fake", is_flag=True, help="Use fake data")
+def main(mqtt_host: str, mqtt_port: int, verbose: bool, fake: bool):
     log_level = logging.DEBUG if verbose else logging.INFO
     log.setLevel(log_level)
 
@@ -124,20 +147,23 @@ def main(mqtt_host: str, mqtt_port: int, verbose: bool):
     device_ids = [sensor.device_id for sensor in sensors]
     if None in device_ids:
         raise ValueError("Malformed configuration: missing device_id property in one or more sensors.")
-    cmd = ["rtl_433", "-F", "json"]
-    for device_id in device_ids:
-        cmd += ["-R", str(device_id)]
 
-    log.info("Running {cmd}".format(cmd=" ".join(cmd)))
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if fake:
+        process = FakeProcess()
+        log.info("Using fake data")
+    else:
+        cmd = ["rtl_433", "-F", "json"]
+        for device_id in device_ids:
+            cmd += ["-R", str(device_id)]
+        process = ExternalProcess(cmd)
+        log.info("Running {cmd}".format(cmd=" ".join(cmd)))
 
     client = mqtt.Client(client_id=f'rtl433-to-mqtt-{random_id()}', clean_session=False)
-    client.on_connect = on_connect
-    client.on_message = on_message
+    client.on_connect = on_connect(mqtt_host, mqtt_port)
     client.connect(host=mqtt_host, port=mqtt_port)
 
     try:
-        for line in process.stdout:
+        for line in process:
             try:
                 topic, payload = process_line(line.decode('utf-8'))
             except Warning as warn:
